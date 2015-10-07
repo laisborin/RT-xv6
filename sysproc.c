@@ -7,10 +7,41 @@
 #include "mmu.h"
 #include "proc.h"
 
+#if RT
+int
+sys_print(void)
+{
+  print();
+  return 0;
+}
+int
+sys_teste(void)
+{
+  int deadline, C;
+
+  if(argint(0, &deadline) < 0)
+    return -1;
+  if(argint(1, &C) < 0)
+    return -1;
+  
+  return teste(deadline, C);
+}
+#endif
+
 int
 sys_fork(void)
 {
+  #ifdef RT
+  int D, C;
+
+  if(argint(0, &D) < 0)
+    return -1;
+  if(argint(1, &C) < 0)
+    return -1;
+  return fork(D, C);
+  #else
   return fork();
+  #endif
 }
 
 int

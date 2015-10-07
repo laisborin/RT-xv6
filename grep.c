@@ -63,7 +63,7 @@ main(int argc, char *argv[])
   exit();
 }
 
-// Regexp matcher from Kernighan & Pike,
+// Regexit()p matcher from Kernighan & Pike,
 // The Practice of Programming, Chapter 9.
 
 int matchhere(char*, char*);

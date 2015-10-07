@@ -81,6 +81,7 @@ trap(struct trapframe *tf)
   //PAGEBREAK: 13
   default:
     if(proc == 0 || (tf->cs&3) == 0){
+      cprintf("unexpected = %d, %d\n", proc, (tf->cs&3));
       // In kernel, it must be our mistake.
       cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
               tf->trapno, cpu->id, tf->eip, rcr2());
@@ -94,7 +95,7 @@ trap(struct trapframe *tf)
     proc->killed = 1;
   }
 
-  // Force process exit if it has been killed and is in user space.
+  // Force process exit() if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running 
   // until it gets to the regular system call return.)
   if(proc && proc->killed && (tf->cs&3) == DPL_USER)

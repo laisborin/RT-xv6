@@ -24,7 +24,11 @@ main(int argc, char *argv[])
   memset(data, 'a', sizeof(data));
 
   for(i = 0; i < 4; i++)
+    #ifdef RT
+    if(fork(5, 5) > 0)
+    #else
     if(fork() > 0)
+    #endif
       break;
 
   printf(1, "write %d\n", i);

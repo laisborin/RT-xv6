@@ -1,5 +1,5 @@
 // Test that fork fails gracefully.
-// Tiny executable so that the limit can be filling the proc table.
+// Tiny exit()ecutable so that the limit can be filling the proc table.
 
 #include "types.h"
 #include "stat.h"
@@ -21,7 +21,11 @@ forktest(void)
   printf(1, "fork test\n");
 
   for(n=0; n<N; n++){
+    #ifdef RT
+    pid = fork(10, 10);
+    #else
     pid = fork();
+    #endif
     if(pid < 0)
       break;
     if(pid == 0)

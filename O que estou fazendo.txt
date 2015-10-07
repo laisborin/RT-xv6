@@ -1,0 +1,27 @@
+
+
+Dúvidas:
+- Criar ou não uma fila de processos prontos?
+
+
+
+
+
+
+
+Criar chamada de sistema para teste:
+Modificar os arquivos:
+	- proc.c - - Implementação da função
+	- syscall.c - - Comunicação com o assembly
+	- sysproc.c -- Implementação da chamada de sistema
+	- syscall.h
+	- defs.h - - Definição da função
+	- user.h - - Definição da chamada de sistema
+	- usys.S - - Definição no assembly
+
+
+	sudo apt-get install g++-multilib libc6-dev-i386
+
+	Foi necessário alterar stdlib.h padrão do C, conflito com a função exit do xv6 -> /usr/include/stdlib.h
+
+	/usr/include/sys/cdefs.h

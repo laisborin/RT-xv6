@@ -21,7 +21,11 @@ main(void)
 
   for(;;){
     printf(1, "init: starting sh\n");
+    #ifdef RT
+    pid = fork(5, 5);
+    #else
     pid = fork();
+    #endif
     if(pid < 0){
       printf(1, "init: fork failed\n");
       exit();

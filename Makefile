@@ -14,6 +14,7 @@ OBJS = \
 	mp.o\
 	picirq.o\
 	pipe.o\
+	heap.o\
 	proc.o\
 	spinlock.o\
 	string.o\
@@ -208,7 +209,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 2
+CPUS := 1
 endif
 QEMUOPTS = -hdb fs.img xv6.img -smp $(CPUS) -m 512 $(QEMUEXTRA)
 

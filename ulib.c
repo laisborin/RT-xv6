@@ -73,6 +73,7 @@ stat(char *n, struct stat *st)
   int fd;
   int r;
 
+  printf(1, "n = %s\n", n);
   fd = open(n, O_RDONLY);
   if(fd < 0)
     return -1;

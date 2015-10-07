@@ -53,6 +53,15 @@ enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
 // Per-process state
 struct proc {
+  #ifdef RT
+
+  uint miss;                    // Number of miss
+  unsigned long long arrtime;   // Arrival time of process 
+  unsigned long long firstsch;  // First scheduling of process
+  uint D;                       // Deadline = ms
+  uint C;                       // Computation time = ms
+
+  #endif
   uint sz;                     // Size of process memory (bytes)
   pde_t* pgdir;                // Page table
   char *kstack;                // Bottom of kernel stack for this process
@@ -67,6 +76,18 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 };
+
+#ifdef RT
+// Estrutura usada para armazenar dados sobre a execução dos processos
+struct statistic {
+  uint miss;                   // Number of miss
+  unsigned long long arrtime;  // Arrival time of process 
+  unsigned long long firstsch; // Time of the first scheduling of process
+  uint D;                      // Deadline = ms
+  uint C;
+  int pid;  
+};
+#endif
 
 // Process memory is laid out contiguously, low addresses first:
 //   text

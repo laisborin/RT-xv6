@@ -183,8 +183,11 @@ int
 fork1(void)
 {
   int pid;
-  
+  #ifdef RT
+  pid = fork(5, 5);
+  #else
   pid = fork();
+  #endif 
   if(pid == -1)
     panic("fork");
   return pid;
