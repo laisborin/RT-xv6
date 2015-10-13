@@ -1,11 +1,20 @@
+-> Manter por enquanto os mesmos estados para o processo. Criar somente depois para fazer a diferenciação entre um conjunto de processos estático e dinâmicos.
 
+Estático: realizar toda a instanciação de processos através do fork, atribuindo um estado intermediário entre RUNNABLE e RUNNING, que seria um estado sinalizador de 'pronto para ser usado pelo sistema', significaria que o sistema já tem conhecimento da existência do determinado processo e saberá que não havéra mudanças no conjunto de processos no decorrer da execução.
 
-Dúvidas:
-- Criar ou não uma fila de processos prontos?
+Dinâmico: Os processos serão instanciados através do fork e já estarão aptos para serem executados, logo, se não entrarem em execução, ficarão na fila de pronto com o estado em RUNNABLE.. Assim, uma rotina deverá ser implementada de forma a realizar forks periódicamente durante a execução do sistema. A aplicação poderá mudar a quantidade de processo no conjunto universo durante a execução.
 
+-> Criar funções de manipulação de fila de pronto
 
+-> Modificar fork para receber deadline
 
+-> Criar função para cálcular processo que está perdendo o prazo e ordenar por ordem crescente na fila de pronto.
 
+-> Modificar scheduler para verificar se o primeiro processo na fila de pronto tem um prazo mais curto que o processo que está executando.
+
+-> Pensar em como implemetar o cálculo do tempo. Pensar depois de finalizar o citado.
+
+-> Adicionar relógio global de execução para saber o tempo que passou dada a inicialização do sistema. Fazer a diferença.
 
 
 
@@ -22,6 +31,32 @@ Modificar os arquivos:
 
 	sudo apt-get install g++-multilib libc6-dev-i386
 
-	Foi necessário alterar stdlib.h padrão do C, conflito com a função exit do xv6 -> /usr/include/stdlib.h
+	Manipular a pilha somente
+	dentro das travas de proc em ptable para garantir a consitência dos dados do processo
 
-	/usr/include/sys/cdefs.h
+
+	ok - COMO ACESSAR O REGISTRADOR DE TEMPO?
+
+	IMPLEMENTAR FUNÇÃO DE ORDENAÇÃO
+
+	TRATAR OVERFLOW DO TIPO
+
+	ok - INSERIR NOVAMENTE O PROCESSO NA FILA DE PRONTO SE ELE AINDA NÃO ACABOU, OU SEJA, EM TODOS OS LUGARES EM QUE O PROCESSO É POSTO COMO RUNNABLE
+
+	MODIFICAR PARÂMETRO DO fork()
+
+
+
+	Sobre o TSC:
+	- https://www.ccsl.carleton.ca/~jamuir/rdtscpm1.pdf
+
+
+	ok - ARRUMAR ESTRUTURA DA FILA DE PRONTOS
+	
+
+
+	ok - INSERIR TEMPO DE COMPUTAÇÃO
+		MUDAR O FORK ;)
+
+	ok- VERIFICAR ONDE ESTÁ O PROBLEMA DA INICIALIZAÇÃO;
+

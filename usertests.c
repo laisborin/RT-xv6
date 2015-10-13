@@ -8,7 +8,7 @@
 #include "traps.h"
 #include "memlayout.h"
 
-static __inline__ unsigned long long ti()
+static __inline__ unsigned long long T()
 {
   unsigned long long t;
   __asm__ __volatile__ ("rdtsc" : "=A"(t));
@@ -23,10 +23,44 @@ void a(int c){
 int
 main(int argc, char *argv[])
 {
-  int i, pid, c, d;
+  int i = 0, stop, pid, c, d, start[3] = {T(), T(), T()};
 
-  for(i = 0; i < 30 ; i++){
-    #ifdef RT
+  #ifdef RT
+  //print(0); // Zera
+  while(1){
+    stop = T();
+
+    d = 3; c = 1;
+    if(stop - start[0] == 5 && (pid=fork(d, c)) == 0){
+      a(c);
+      exit();
+      start[0] = T();
+      i++;
+    }
+    d = 4; c = 2;
+    if(stop - start[1] == 15 && (pid=fork(d, c)) == 0){
+      a(c);
+      exit();
+      start[1] = T();
+      i++;
+    }
+
+    d = 2; c = 5;
+    if(stop - start[3] == 20 && (pid=fork(d, c)) == 0){
+      a(c);
+      exit();
+      start[2] = T();
+      i++;
+    }
+    if(stop - start[0] > 10000){
+      printf(1, "aa\n");
+      break;
+    }
+  }
+   printf(1, "i = %d\n", i);
+  #endif
+  /*for(i = 0; i < 30 ; i++){
+
     d = 3;
     c = 1;
     if((pid=fork(d, c))==0){
@@ -40,11 +74,11 @@ main(int argc, char *argv[])
       #endif
       exit();
     }
-  } 
+  } */
 
   while(wait() != -1);
-#ifdef RT
-  print();
-#endif
+  #ifdef RT
+  print(1); //Mostra
+  #endif
   exit();
 }

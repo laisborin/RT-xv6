@@ -29,7 +29,7 @@ void getData(struct proc *p);
 void printQueue();
 
 int teste(int, int); //Chamada de sistema
-int print(void);
+int print(int);
 void testeTwo(void);
 
 
@@ -620,20 +620,33 @@ void getData(struct proc *p){
   }
 }
 
-int print(void){
+int print(int flag){
   int i;
-  cprintf("Pid D C Miss A F\n");
-  for(i = 0; i < itr_s; i++){
-    // bug in the cprintf
-    cprintf("%d ",  statistic[i].pid);
-    cprintf("%d ",  statistic[i].D);
-    cprintf("%d ",  statistic[i].C);
-    cprintf("%d ",  statistic[i].miss);
-    cprintf("%d ",  statistic[i].arrtime);
-    cprintf("%d\n",  statistic[i].firstsch);
+  cprintf("oi %d\n", flag);
+  if(flag > 0 ){
+    cprintf("\nPid D   C  Miss  A     F\n");
+    for(i = 0; i < itr_s; i++){
+      // bug in the cprintf
+      cprintf("%d   ",  statistic[i].pid);
+      cprintf("%d   ",  statistic[i].D);
+      cprintf("%d   ",  statistic[i].C);
+      cprintf("%d   ",  statistic[i].miss);
+      cprintf("%d   ",  statistic[i].arrtime);
+      cprintf("%d\n",  statistic[i].firstsch);
+    }
+    
+    cprintf("Context swtch = %d", ctxswt);
+    cprintf("   Process = %d\n", flag);
   }
-  
-  cprintf("Context swtch = %d", ctxswt);
+  for(i = 0; i < itr_s; i++){
+    statistic[i].pid = 0;
+    statistic[i].D = 0;
+    statistic[i].C = 0;
+    statistic[i].miss = 0;
+    statistic[i].arrtime = 0;
+    statistic[i].firstsch = 0;
+  }
+  itr_s = ctxswt = 0;
 
   return 0; 
 }

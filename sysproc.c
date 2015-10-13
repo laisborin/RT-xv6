@@ -11,7 +11,11 @@
 int
 sys_print(void)
 {
-  print();
+  int flag;
+  if(argint(0, &flag) < 0)
+    return -1;
+  
+  print(flag);
   return 0;
 }
 int

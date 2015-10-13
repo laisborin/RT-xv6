@@ -5,7 +5,7 @@ struct rtcdate;
 #ifdef RT
 int teste(int, int);
 int fork(int, int);
-int print(void);
+int print(int);
 #else
 int fork(void);
 #endif
