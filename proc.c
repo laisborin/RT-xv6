@@ -146,8 +146,8 @@ userinit(void)
   itr_q = 0;
   itr_s = 0;
  //cprintf("userinit\n");
-  p->D = 5;                            // First user process, requires a start
-  p->C = 3;
+  p->D = 100;                            // First user process, requires a start
+  p->C = 100;
   p->arrtime = tick();
   ptable.queue[itr_q] = p; 
   crtime = tick();
@@ -622,7 +622,6 @@ void getData(struct proc *p){
 
 int print(int flag){
   int i;
-  cprintf("oi %d\n", flag);
   if(flag > 0 ){
     cprintf("\nPid D   C  Miss  A     F\n");
     for(i = 0; i < itr_s; i++){
@@ -635,8 +634,7 @@ int print(int flag){
       cprintf("%d\n",  statistic[i].firstsch);
     }
     
-    cprintf("Context swtch = %d", ctxswt);
-    cprintf("   Process = %d\n", flag);
+    cprintf("Context swtch = %d\n", ctxswt);
   }
   for(i = 0; i < itr_s; i++){
     statistic[i].pid = 0;

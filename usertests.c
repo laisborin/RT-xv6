@@ -23,41 +23,56 @@ void a(int c){
 int
 main(int argc, char *argv[])
 {
-  int i = 0, stop, pid, c, d, start[3] = {T(), T(), T()};
+  
 
   #ifdef RT
-  //print(0); // Zera
+  print(0); // Zera
+  int pid, c, d;
+  unsigned long long i = T(), stop, start[4] = {T(), T(), T(), T()};
   while(1){
     stop = T();
 
-    d = 3; c = 1;
-    if(stop - start[0] == 5 && (pid=fork(d, c)) == 0){
-      a(c);
-      exit();
+    d = 4; c = 1;
+    if(stop - start[0] == 10){
       start[0] = T();
-      i++;
+      if((pid=fork(d, c)) == 0){ 
+        a(c);
+        exit();
+      } 
     }
-    d = 4; c = 2;
-    if(stop - start[1] == 15 && (pid=fork(d, c)) == 0){
-      a(c);
-      exit();
+    d = 6; c = 2;
+    if(stop - start[1] == 15){
       start[1] = T();
-      i++;
+      if((pid=fork(d, c)) == 0){ 
+        a(c);
+        exit();
+      } 
     }
 
-    d = 2; c = 5;
-    if(stop - start[3] == 20 && (pid=fork(d, c)) == 0){
-      a(c);
-      exit();
+    d = 10; c = 5;
+    if(stop - start[2] == 25){
       start[2] = T();
-      i++;
+      if((pid=fork(d, c)) == 0){ 
+        a(c);
+        exit();
+      } 
     }
-    if(stop - start[0] > 10000){
+
+    d = 16; c = 3;
+    if(stop - start[3] == 30){
+      start[3] = T();
+      if((pid=fork(d, c)) == 0){ 
+        a(c);
+        exit();
+      } 
+    }
+
+    if(stop - i > 10000){
       printf(1, "aa\n");
       break;
     }
   }
-   printf(1, "i = %d\n", i);
+
   #endif
   /*for(i = 0; i < 30 ; i++){
 

@@ -2,7 +2,7 @@
 #define RIGHT(x) (2 * x + 2)
 #define PARENT(x) (x / 2)
 
-int crtime;
+unsigned long long crtime;
 
 void heapify(struct proc **A, int, int);
 void increasekey(struct proc **A, int);

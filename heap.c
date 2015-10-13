@@ -7,17 +7,22 @@
 #include "proc.h"
 
 int deadline(struct proc *p){
-  int decorrido = crtime - p->arrtime;
-  int rest = p->D - decorrido;
-
-  if(rest >= p->C)
-    return rest - p->C;
-  else {p->miss++; cprintf("%d ----- M I S S ------ %d\n",p->pid, p->miss);}
+ 
+  if(crtime <= (p->arrtime + p->D)){  
+    return (p->arrtime + p->D) - crtime;
+  }
+  else { 
+    p->miss++; 
+    cprintf("%d ----- M I S S ------ ct = %d", p->pid, crtime);
+    cprintf("  c = %d d = %d arr = %d", p->C, p->D, p->arrtime);
+    cprintf("  sum = %d\n", (p->arrtime + p->D));
+  
+  }
 
   //cprintf("%d curr = %d cheg = %d d = %d c = %d\n",p->pid, crtime, p->arrtime, p->D, p->C);
     //cprintf(" ----- M I S S ------\n");
 
-  return -1;
+  return 0;
 }
 
 void heapify(struct proc **A, int itr_q, int i){
