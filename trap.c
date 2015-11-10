@@ -77,22 +77,29 @@ trap(struct trapframe *tf)
             cpu->id, tf->cs, tf->eip);
     lapiceoi();
     break;
-   
+  case 14:
+    if(cpu->id == 0){
+        acquire(&tickslock);
+        ticks++;
+        wakeup(&ticks);
+        release(&tickslock);
+      }
+    break;
   //PAGEBREAK: 13
   default:
-    if(proc == 0 || (tf->cs&3) == 0){
-      cprintf("unexpected = %d, %d\n", proc, (tf->cs&3));
-      // In kernel, it must be our mistake.
-      cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
-              tf->trapno, cpu->id, tf->eip, rcr2());
-      panic("trap");
-    }
-    // In user space, assume process misbehaved.
-    cprintf("pid %d %s: trap %d err %d on cpu %d "
-            "eip 0x%x addr 0x%x--kill proc\n",
-            proc->pid, proc->name, tf->trapno, tf->err, cpu->id, tf->eip, 
-            rcr2());
-    proc->killed = 1;
+      if(proc == 0 || (tf->cs&3) == 0){
+        cprintf("unexpected = %d, %d\n", T_IRQ0, IRQ_TIMER);
+        // In kernel, it must be our mistake.
+        cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
+                tf->trapno, cpu->id, tf->eip, rcr2());
+        panic("trap");
+      }
+      // In user space, assume process misbehaved.
+      cprintf("pid %d %s: trap %d err %d on cpu %d "
+              "eip 0x%x addr 0x%x--kill proc\n",
+              proc->pid, proc->name, tf->trapno, tf->err, cpu->id, tf->eip, 
+              rcr2());
+      proc->killed = 1;
   }
 
   // Force process exit() if it has been killed and is in user space.
@@ -101,10 +108,16 @@ trap(struct trapframe *tf)
   if(proc && proc->killed && (tf->cs&3) == DPL_USER)
     exit();
 
+  
+  #ifdef RT
+  if(proc && proc->state == RUNNING && interrupt)
+    yield();
+  #else
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
   if(proc && proc->state == RUNNING && tf->trapno == T_IRQ0+IRQ_TIMER)
     yield();
+  #endif
 
   // Check if the process has been killed since we yielded
   if(proc && proc->killed && (tf->cs&3) == DPL_USER)

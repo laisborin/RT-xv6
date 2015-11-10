@@ -8,41 +8,28 @@
 #include "proc.h"
 #include "fs.h"
 #include "spinlock.h"
+#define TAM 50 // TAM*NPROC = statistic
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  struct proc *queue[NPROC]; // Ready queue
-  
+  #ifdef RT
+  struct proc *queue[NPROC]; // Ready queue  
+  #endif
 } ptable;
 
-#if RT
+#ifdef RT
 uint itr_q; // Iterator in ready queue
-
 uint itr_s; // Iterator in statistic
-struct statistic statistic[NPROC*3];  
+uint frozen;
+struct statistic statistic[NPROC*TAM];  
 
 unsigned int ctxswt;         // Number of context swtch
 
 void getData(struct proc *p);
-
-void printQueue();
-
-int teste(int, int); //Chamada de sistema
-int print(int);
-void testeTwo(void);
-
-
-
-
-static __inline__ unsigned long long tick()
-{
-  unsigned long long t;
-  __asm__ __volatile__ ("rdtsc" : "=A"(t));
-  return t >> 22;
-}
-
-
+void printQueue(); // aux
+void freeze(int);
+int  print(int);
 #endif
 
 static struct proc *initproc;
@@ -102,13 +89,17 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-  #if RT
+  #ifdef RT
+  interrupt = 0;
   p->D = 0;
   p->C = 0;
   p->miss = 0;
   p->arrtime = 0;       // Tempo de chegada
   p->firstsch = 0;      // Instante do primeiro escalonamento
-
+  #if !RT
+  p->P = 0;
+  p->O = 0;
+  #endif
   #endif
 
   return p;
@@ -141,16 +132,18 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
-  #if RT
+  #ifdef RT
   acquire(&ptable.lock);
   itr_q = 0;
   itr_s = 0;
- //cprintf("userinit\n");
   p->D = 100;                            // First user process, requires a start
   p->C = 100;
-  p->arrtime = tick();
+  #if !RT
+  p->P = 1;
+  p->O = 1;			
+  frozen = 0;   // Sinaliza a criação de processos do sistema
+  #endif
   ptable.queue[itr_q] = p; 
-  crtime = tick();
   release(&ptable.lock);
   #endif
 }
@@ -179,8 +172,10 @@ growproc(int n)
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
 int
-#ifdef RT
+#if RT
 fork(int d, int c)
+#elif !RT
+fork(int d, int c, int p, int o)
 #else
 fork(void)
 #endif
@@ -219,23 +214,35 @@ fork(void)
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
-  #if RT
 
-  np->D = d; // Set deadline
-  np->C = c; // Set computation time
-  //cprintf("d = %d c = %d\n", np->D, np->C);
-  np->arrtime = tick(); // Get arrival time
-  //cprintf("--- fork(%d) ------------------------------------ %d\n",np->pid, itr_q);
-  //if(itr_q == -1) itr_q = 0;
+  #if RT // EDF
+  np->D = d; 							// Set deadline
+  np->C = c; 							// Set computation time
+  np->arrtime = tick();                 // Get arrival time
+
   itr_q++;
-  ptable.queue[itr_q] = np;                     // Insert p into queue
-  crtime = tick();                       // Get current time
-  increasekey(ptable.queue, itr_q);             // Sort queue by EDF
-  //cprintf("-d = %d c = %d\n", np->D, np->C);
-  //cprintf("itr_q = %d\n", itr_q);
-  //printQueue();
-  #endif
+  ptable.queue[itr_q] = np;             // Insert np into queue
+  increasekey(ptable.queue, itr_q);     // Sort queue by EDF 
   release(&ptable.lock);
+  interrupt = 1;
+
+  #else // PT
+  np->D = d;                            // Set deadline
+  np->C = c;                            // Set computation time
+  np->P = p;							// Set priority
+  np->O = o;							// Set threshold
+
+  if(frozen){np->state = WAITING;}      // Criação de processos em lote
+  else{									                // Criação de processos do sistema
+    np->arrtime = tick();               // Get arrival time
+    itr_q++;
+    ptable.queue[itr_q] = np;           // Insert np into queue
+    increasekey(ptable.queue, itr_q);   // Sort queue by PT
+  }
+  release(&ptable.lock);
+  #endif
+  
+  //release(&ptable.lock);
   
   return pid;
 }
@@ -264,8 +271,6 @@ exit(void)
   iput(proc->cwd);
   end_op();
   proc->cwd = 0;
-
-  getData(proc); // Get data before exit the process
 
   acquire(&ptable.lock);
 
@@ -314,9 +319,13 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
-        #if RT
+        #ifdef RT
         p->D = 0;
         p->C = 0;
+        #if !RT
+        p->P = 0;
+        p->O = 0;
+        #endif
         p->arrtime = 0;
         p->firstsch = 0;
         p->miss = 0;
@@ -352,43 +361,37 @@ scheduler(void)
 
   for(;;){
     // Enable interrupts on this processor.
+
     sti();
-
-    // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    //cprintf("itr_q = %d\n", itr_q);
+    
+    #ifdef RT
     if(itr_q != -1){
-      //cprintf("Escalonando um processo pid = %d itr_q = %d\n", ptable.queue[0]->pid, itr_q);      
-      
-      // Get the EDF process
       p = ptable.queue[0];
+      #if !RT
+      if(!frozen || p->P > proc->O){                // Escalonamento com PT    
+      #endif
+        
       ptable.queue[0] = ptable.queue[itr_q];
-      crtime = tick();
-
-      // Sort queue
-      heapify(ptable.queue, itr_q, 0);
-      //printQueue();
+      heapify(ptable.queue, itr_q, 0);		        // Sort queue
       itr_q--;
 
-     //cprintf("itr_q = %d\n", itr_q);
-      
       proc = p;
       switchuvm(p);
       p->state = RUNNING;
-      
-      //cprintf("swtch - scheduler\n");
 
-      // Get data
-      if(p->firstsch == 0) p->firstsch = tick();
+      if(p->firstsch == 0) p->firstsch = tick();  // Get data
 
       ctxswt++;
       swtch(&cpu->scheduler, proc->context);
       switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
       proc = 0;
+
+      #if !RT    
+      }
+      #endif
     }
+    #endif
     release(&ptable.lock);
   }
 }
@@ -399,7 +402,6 @@ void
 sched(void)
 {
   int intena;
- //cprintf("sched\n");
 
   if(!holding(&ptable.lock))
     panic("sched ptable.lock");
@@ -410,8 +412,10 @@ sched(void)
   if(readeflags()&FL_IF)
     panic("sched interruptible");
   intena = cpu->intena;
-
+  #ifdef RT
   ctxswt++;
+  #endif
+  
   swtch(&proc->context, cpu->scheduler);
   cpu->intena = intena;
 }
@@ -420,22 +424,22 @@ sched(void)
 void
 yield(void)
 {
-
   acquire(&ptable.lock);  //DOC: yieldlock
-  proc->state = RUNNABLE; 
-  #if RT
- //cprintf("yield------------------------- %d\n", itr_q);
-  //if(itr_q == -1) itr_q = 0;
-  itr_q++;
-  ptable.queue[itr_q] = proc;               // Insert p into queue
-
-  increasekey(ptable.queue, itr_q);
-  //itr_q++;
- //cprintf("itr_q = %d\n", itr_q);
-  //printQueue();
-  //heapinsert(queue, itr_q, proc);
+  #if !RT
+  if(ptable.queue[0]->P > proc->O){
   #endif
-  sched();
+    proc->state = RUNNABLE;
+    #ifdef RT
+    itr_q++;
+    ptable.queue[itr_q] = proc;               // Insert proc into queue
+    increasekey(ptable.queue, itr_q);
+    #endif
+    sched();
+  #ifdef RT
+  }
+  interrupt = 0;
+  #endif
+  
   release(&ptable.lock);
 }
 
@@ -508,16 +512,12 @@ wakeup1(void *chan)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
-      #if RT
-     //cprintf("wakeup1 ------------------------- %d\n", itr_q);
-      //if(itr_q == -1) itr_q = 0;
+      #ifdef RT
+      p->arrtime = tick();		          //Necessário para realizar os testes
+      p->firstsch = 0;
       itr_q++;
-      ptable.queue[itr_q] = p;                     // Insert p into queue
-      increasekey(ptable.queue, itr_q); 
-      //itr_q++;
-     //cprintf("itr_q = %d\n", itr_q);
-      //printQueue();
-      //heapinsert(queue, itr_q, p);
+      ptable.queue[itr_q] = p;          // Insert p into queue
+      increasekey(ptable.queue, itr_q);
       #endif
     }
 }
@@ -529,6 +529,7 @@ wakeup(void *chan)
   acquire(&ptable.lock);
   wakeup1(chan);
   release(&ptable.lock);
+  interrupt = 1;          // Enable interrupts
 }
 
 // Kill the process with the given pid.
@@ -546,16 +547,11 @@ kill(int pid)
       // Wake process from sleep if necessary.
       if(p->state == SLEEPING){
         p->state = RUNNABLE;
-        #if RT
-       //cprintf("kill ------------------ %d\n", itr_q);
-        //if(itr_q == -1) itr_q = 0;
+        #ifdef RT
         itr_q++;
         ptable.queue[itr_q] = p;                     // Insert p into queue
         increasekey(ptable.queue, itr_q);
-        //itr_q++;
-       //cprintf("itr_q = %d\n", itr_q);
         printQueue();
-        //heapinsert(queue, itr_q, p);
         #endif
       }
       release(&ptable.lock);
@@ -579,7 +575,8 @@ procdump(void)
   [SLEEPING]  "sleep ",
   [RUNNABLE]  "runble",
   [RUNNING]   "run   ",
-  [ZOMBIE]    "zombie"
+  [ZOMBIE]    "zombie",
+  [WAITING]   "waiting"
   };
   int i;
   struct proc *p;
@@ -603,17 +600,21 @@ procdump(void)
   }
 }
 
-#if RT
-
+#ifdef RT
 void getData(struct proc *p){
 
-  if(itr_s > (NPROC*3 -1)){
+  if(itr_s > (NPROC*TAM -1)){
     cprintf("ERROR: FULL DATA! Ignoring statistic process... %d\n", itr_s);
   }else{
-    statistic[itr_s].firstsch = p->firstsch;
-    statistic[itr_s].arrtime = p->arrtime;
+    #if !RT
+    statistic[itr_s].P = p->P;
+    statistic[itr_s].O = p->O; 
+    #endif
+    statistic[itr_s].firstsch = p->firstsch; p->firstsch = 0;
+    statistic[itr_s].arrtime = p->arrtime; p->arrtime = tick();
+    statistic[itr_s].miss = p->miss; p->miss = 0;
+    statistic[itr_s].finish = tick();
     statistic[itr_s].pid = p->pid;
-    statistic[itr_s].miss = p->miss;
     statistic[itr_s].C = p->C;
     statistic[itr_s].D = p->D;
     itr_s++;
@@ -622,51 +623,75 @@ void getData(struct proc *p){
 
 int print(int flag){
   int i;
-  if(flag > 0 ){
-    cprintf("\nPid D   C  Miss  A     F\n");
+  if(flag == 2){
+    getData(proc);
+  }else if(flag == 1 ){
+    #if !RT
+    cprintf("\nP-O-Pid-D-C-Miss-Arr-First-Finish\n");
+    #else
+    cprintf("\nPid-D-C-Miss-Arr-First-Finish\n");
+    #endif
     for(i = 0; i < itr_s; i++){
       // bug in the cprintf
-      cprintf("%d   ",  statistic[i].pid);
-      cprintf("%d   ",  statistic[i].D);
-      cprintf("%d   ",  statistic[i].C);
-      cprintf("%d   ",  statistic[i].miss);
-      cprintf("%d   ",  statistic[i].arrtime);
-      cprintf("%d\n",  statistic[i].firstsch);
+      #if !RT
+      cprintf("%d-",  statistic[i].P);
+      cprintf("%d-",  statistic[i].O);
+      #endif
+      cprintf("%d-",  statistic[i].pid);
+      cprintf("%d-",  statistic[i].D);
+      cprintf("%d-",  statistic[i].C);
+      cprintf("%d-",  statistic[i].miss);
+      cprintf("%d-",  statistic[i].arrtime);
+      cprintf("%d-",  statistic[i].firstsch);
+      cprintf("%d\n", statistic[i].finish);
     }
     
     cprintf("Context swtch = %d\n", ctxswt);
+  }else{
+    for(i = 0; i < itr_s; i++){
+      #if !RT
+      statistic[i].P = 0;
+      statistic[i].O = 0;
+      #endif
+      statistic[i].pid = 0;
+      statistic[i].D = 0;
+      statistic[i].C = 0;
+      statistic[i].miss = 0;
+      statistic[i].finish = 0;
+      statistic[i].arrtime = 0;
+      statistic[i].firstsch = 0;
+    }
+    itr_s = ctxswt = 0;
   }
-  for(i = 0; i < itr_s; i++){
-    statistic[i].pid = 0;
-    statistic[i].D = 0;
-    statistic[i].C = 0;
-    statistic[i].miss = 0;
-    statistic[i].arrtime = 0;
-    statistic[i].firstsch = 0;
-  }
-  itr_s = ctxswt = 0;
 
   return 0; 
 }
 
-int teste(int i, int a){
+void freeze(int f){
+  struct proc *p;
 
-
-  return i;
+  if(f){
+    frozen = 1;
+  }else{
+    frozen = 0;
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    	if(p->state == WAITING){
+    		p->state = RUNNABLE;          // Unfreeze all created processes
+    		itr_q++;
+    		ptable.queue[itr_q] = p;                     
+    		increasekey(ptable.queue, itr_q);
+    	}
+    }
+    release(&ptable.lock);
+  }
 }
 
 void printQueue(){
   int i;
- //cprintf("\nQueue:\n ");
-
   for(i = 0; i <= itr_q; i++){
-   //cprintf("p->pid = %d -- itr_q = %d\n", ptable.queue[i]->pid, itr_q);
+   cprintf("p->pid = %d -- itr_q = %d\n", ptable.queue[i]->pid, itr_q);
   }
- //cprintf("\n ");
-}
-
-void testeTwo(void){
- //cprintf("Teste dois executado com sucesso!\n");
 }
 
 #endif

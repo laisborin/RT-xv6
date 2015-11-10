@@ -7,7 +7,7 @@
 #include "mmu.h"
 #include "proc.h"
 
-#if RT
+#ifdef RT
 int
 sys_print(void)
 {
@@ -19,16 +19,14 @@ sys_print(void)
   return 0;
 }
 int
-sys_teste(void)
+sys_freeze(void)
 {
-  int deadline, C;
-
-  if(argint(0, &deadline) < 0)
-    return -1;
-  if(argint(1, &C) < 0)
+  int f;
+  if(argint(0, &f) < 0)
     return -1;
   
-  return teste(deadline, C);
+  freeze(f);
+  return 0;
 }
 #endif
 
@@ -36,6 +34,8 @@ int
 sys_fork(void)
 {
   #ifdef RT
+
+  #if RT
   int D, C;
 
   if(argint(0, &D) < 0)
@@ -43,6 +43,19 @@ sys_fork(void)
   if(argint(1, &C) < 0)
     return -1;
   return fork(D, C);
+
+  #else
+  int P, O, D, C;
+  if(argint(0, &D) < 0)
+    return -1;
+  if(argint(1, &C) < 0)
+    return -1;
+  if(argint(2, &P) < 0)
+    return -1;
+  if(argint(3, &O) < 0)
+    return -1;
+  return fork(D, C, P, O);
+  #endif
   #else
   return fork();
   #endif

@@ -22,7 +22,11 @@ main(void)
   for(;;){
     printf(1, "init: starting sh\n");
     #ifdef RT
+    #if RT
     pid = fork(10000, 10000);
+    #else
+    pid = fork(1, 1, 10000, 10000);
+    #endif
     #else
     pid = fork();
     #endif

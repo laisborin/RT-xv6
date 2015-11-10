@@ -77,7 +77,7 @@ argstr(int n, char **pp)
   return fetchstr(addr, pp);
 }
 #ifdef RT
-extern int sys_teste(void);
+extern int sys_freeze(void);
 extern int sys_print(void);
 #endif
 extern int sys_fork(void);
@@ -105,7 +105,7 @@ extern int sys_uptime(void);
 
 static int (*syscalls[])(void) = {
 #ifdef RT
-[SYS_teste]   sys_teste,
+[SYS_freeze]   sys_freeze,
 [SYS_print]   sys_print,
 #endif
 [SYS_fork]    sys_fork,

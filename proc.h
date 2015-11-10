@@ -49,18 +49,20 @@ struct context {
   uint eip;
 };
 
-enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE, WAITING };
 
 // Per-process state
 struct proc {
   #ifdef RT
-
+  #if !RT
+  uint O;                      // Threshold
+  uint P;                      // Priority
+  #endif
   uint miss;                    // Number of miss
   unsigned long long arrtime;   // Arrival time of process 
   unsigned long long firstsch;  // First scheduling of process
   uint D;                       // Deadline = ms
   uint C;                       // Computation time = ms
-
   #endif
   uint sz;                     // Size of process memory (bytes)
   pde_t* pgdir;                // Page table
@@ -78,11 +80,18 @@ struct proc {
 };
 
 #ifdef RT
+uint interrupt;
+
 // Estrutura usada para armazenar dados sobre a execução dos processos
 struct statistic {
+  #if !RT
+  uint O;                      // Threshold
+  uint P;                      // Priority
+  #endif
   uint miss;                   // Number of miss
   unsigned long long arrtime;  // Arrival time of process 
   unsigned long long firstsch; // Time of the first scheduling of process
+  unsigned long long finish;  // Current time
   uint D;                      // Deadline = ms
   uint C;
   int pid;  

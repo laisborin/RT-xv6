@@ -22,7 +22,11 @@ forktest(void)
 
   for(n=0; n<N; n++){
     #ifdef RT
+    #if RT
     pid = fork(10, 10);
+    #else
+    pid = fork(1, 1, 10, 10);
+    #endif
     #else
     pid = fork();
     #endif

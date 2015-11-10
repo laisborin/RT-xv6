@@ -3,9 +3,13 @@ struct rtcdate;
 
 // system calls
 #ifdef RT
-int teste(int, int);
-int fork(int, int);
+int freeze(int);
 int print(int);
+#if RT
+int fork(int, int);
+#else
+int fork(int, int, int, int);
+#endif
 #else
 int fork(void);
 #endif

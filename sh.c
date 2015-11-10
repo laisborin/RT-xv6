@@ -184,7 +184,11 @@ fork1(void)
 {
   int pid;
   #ifdef RT
+  #if RT
   pid = fork(90000, 90000);
+  #else
+  pid = fork(1, 1, 0, 0);
+  #endif
   #else
   pid = fork();
   #endif 

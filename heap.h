@@ -2,9 +2,7 @@
 #define RIGHT(x) (2 * x + 2)
 #define PARENT(x) (x / 2)
 
-unsigned long long crtime;
-
 void heapify(struct proc **A, int, int);
 void increasekey(struct proc **A, int);
 int deadline(struct proc *p);
-char * itoa (int value, char *result, int base);
+unsigned long long tick();

@@ -6,22 +6,19 @@
 #include "x86.h"
 #include "proc.h"
 
+// Used by EDF
+#if RT // MIN HEAP - DEADLINE
 int deadline(struct proc *p){
- 
-  if(crtime <= (p->arrtime + p->D)){  
-    return (p->arrtime + p->D) - crtime;
+  if(tick() <= (p->arrtime + p->D)){  
+    return (p->arrtime + p->D) - tick();
   }
   else { 
     p->miss++; 
-    cprintf("%d ----- M I S S ------ ct = %d", p->pid, crtime);
+    cprintf("%d ----- M I S S ------ ct = %d", p->pid, tick());
     cprintf("  c = %d d = %d arr = %d", p->C, p->D, p->arrtime);
     cprintf("  sum = %d\n", (p->arrtime + p->D));
   
   }
-
-  //cprintf("%d curr = %d cheg = %d d = %d c = %d\n",p->pid, crtime, p->arrtime, p->D, p->C);
-    //cprintf(" ----- M I S S ------\n");
-
   return 0;
 }
 
@@ -37,18 +34,6 @@ void heapify(struct proc **A, int itr_q, int i){
   }
 }
 
-struct proc *extractmin(struct proc **A, int itr_q){
-  struct proc *min;
-  if(itr_q > -1){
-    min = A[0];
-    A[0] = A[itr_q];
-    heapify(A, itr_q, 0);
-    itr_q--;
-  }
-
-  return min;
-}
-
 void increasekey(struct proc **A, int i){
   struct proc *swap;
       
@@ -58,43 +43,33 @@ void increasekey(struct proc **A, int i){
   }
 }
 
-void heapinsert(struct proc **A, int itr_q, struct proc *p){
-  A[itr_q] = p;
-  increasekey(A, itr_q);
-  itr_q++;
+
+// Used by PT
+#else // MAX HEAP - PRIORITY
+void heapify(struct proc **A, int itr_q, int i){
+  int max = i;
+  struct proc *swap;
+
+  if(LEFT(i) < itr_q && A[LEFT(i)]->P > A[i]->P)       max = LEFT(i);
+  if(RIGHT(i) < itr_q && A[RIGHT(i)]->P > A[max]->P)  max = RIGHT(i);
+  if(max != i){
+    swap = A[i];  A[i] = A[max];  A[max] = swap;
+    heapify(A, itr_q, max);
+  }
 }
 
-void oi(void){
-  cprintf("oie -----------------------------\n");
+void increasekey(struct proc **A, int i){
+  struct proc *swap;
+      
+  while(i > 0 && A[PARENT(i)]->P < A[i]->P){
+    swap = A[i]; A[i] = A[PARENT(i)]; A[PARENT(i)] = swap;
+    i = PARENT(i);
+  }
 }
+#endif
 
-
-/*
-Extracted function of http://www.strudel.org.uk/itoa/
-Written by Lukás Chmela
-Version 0.4
-*/
-
-char * itoa (int value, char *result, int base){
-    // check that the base if valid
-    if (base < 2 || base > 36) { *result = '\0'; return result; }
-
-    char* ptr = result, *ptr1 = result, tmp_char;
-    int tmp_value;
-
-    do {
-        tmp_value = value;
-        value /= base;
-        *ptr++ = "zyxwvutsrqponmlkjihgfedcba9876543210123456789abcdefghijklmnopqrstuvwxyz" [35 + (tmp_value - value * base)];
-    } while ( value );
-
-    // Apply negative sign
-    if (tmp_value < 0) *ptr++ = '-';
-    *ptr-- = '\0';
-    while (ptr1 < ptr) {
-        tmp_char = *ptr;
-        *ptr--= *ptr1;
-        *ptr1++ = tmp_char;
-    }
-    return result;
+unsigned long long tick() {
+  unsigned long long t;
+  __asm__ __volatile__ ("rdtsc  " : "=A"(t));
+  return t >> 21;
 }

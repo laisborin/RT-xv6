@@ -9,7 +9,11 @@ int
 main(void)
 {
 	#ifdef RT
+	#if RT
 	if(fork(5, 5) > 0)
+	#else
+	if(fork(1, 1, 5, 5) > 0)
+	#endif
 	#else
 	if(fork() > 0)
 	#endif

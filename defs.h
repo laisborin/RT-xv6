@@ -107,9 +107,13 @@ int             pipewrite(struct pipe*, char*, int);
 struct proc*    copyproc(struct proc*);
 void            exit(void);
 #ifdef RT
-int             teste(int, int);
-int             fork(int, int);
+void            freeze(int);
 int 			print(int);
+#if RT
+int             fork(int, int);
+#else
+int 			fork(int, int, int, int);
+#endif
 #else
 int             fork(void);
 #endif

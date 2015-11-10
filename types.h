@@ -5,5 +5,9 @@ typedef unsigned long long ull;
 typedef uint pde_t;
 
 
+// If define RT -> Real time mode
+// If RT = 1 -> EDF
+// Else -> Threshold
+
 // EDF = 1, Threshold = 0
-#define RT 1 // Real time mode
+#define RT 0 // Real time mode

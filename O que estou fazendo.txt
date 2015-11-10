@@ -60,3 +60,6 @@ Modificar os arquivos:
 
 	ok- VERIFICAR ONDE ESTÁ O PROBLEMA DA INICIALIZAÇÃO;
 
+	usar sleep()
+
+	Chamada de sistema para descongelar processos
