@@ -58,7 +58,7 @@ struct proc {
   uint O;                      // Threshold
   uint P;                      // Priority
   #endif
-  uint miss;                    // Number of miss
+  uint ctxswt;                  // Number of context swtch
   unsigned long long arrtime;   // Arrival time of process 
   unsigned long long firstsch;  // First scheduling of process
   uint D;                       // Deadline = ms
@@ -88,12 +88,12 @@ struct statistic {
   uint O;                      // Threshold
   uint P;                      // Priority
   #endif
-  uint miss;                   // Number of miss
   unsigned long long arrtime;  // Arrival time of process 
   unsigned long long firstsch; // Time of the first scheduling of process
-  unsigned long long finish;  // Current time
+  unsigned long long finish;   // Current time
   uint D;                      // Deadline = ms
   uint C;
+  uint ctxswt;
   int pid;  
 };
 #endif

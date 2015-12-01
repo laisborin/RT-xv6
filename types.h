@@ -8,6 +8,4 @@ typedef uint pde_t;
 // If define RT -> Real time mode
 // If RT = 1 -> EDF
 // Else -> Threshold
-
-// EDF = 1, Threshold = 0
 #define RT 0 // Real time mode

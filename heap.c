@@ -5,20 +5,20 @@
 #include "mmu.h"
 #include "x86.h"
 #include "proc.h"
-
+#ifdef RT
 // Used by EDF
 #if RT // MIN HEAP - DEADLINE
 int deadline(struct proc *p){
   if(tick() <= (p->arrtime + p->D)){  
     return (p->arrtime + p->D) - tick();
   }
-  else { 
+ /* else { 
     p->miss++; 
     cprintf("%d ----- M I S S ------ ct = %d", p->pid, tick());
     cprintf("  c = %d d = %d arr = %d", p->C, p->D, p->arrtime);
     cprintf("  sum = %d\n", (p->arrtime + p->D));
   
-  }
+  }*/
   return 0;
 }
 
@@ -73,3 +73,4 @@ unsigned long long tick() {
   __asm__ __volatile__ ("rdtsc  " : "=A"(t));
   return t >> 21;
 }
+#endif  

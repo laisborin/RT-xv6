@@ -8,7 +8,7 @@
 #include "proc.h"
 #include "fs.h"
 #include "spinlock.h"
-#define TAM 50 // TAM*NPROC = statistic
+#define TAM 45000 // TAM*NPROC = statistic
 
 struct {
   struct spinlock lock;
@@ -18,13 +18,13 @@ struct {
   #endif
 } ptable;
 
+
 #ifdef RT
+int miss;
 uint itr_q; // Iterator in ready queue
 uint itr_s; // Iterator in statistic
 uint frozen;
-struct statistic statistic[NPROC*TAM];  
-
-unsigned int ctxswt;         // Number of context swtch
+struct statistic statistic[TAM];  
 
 void getData(struct proc *p);
 void printQueue(); // aux
@@ -93,7 +93,6 @@ found:
   interrupt = 0;
   p->D = 0;
   p->C = 0;
-  p->miss = 0;
   p->arrtime = 0;       // Tempo de chegada
   p->firstsch = 0;      // Instante do primeiro escalonamento
   #if !RT
@@ -133,6 +132,7 @@ userinit(void)
 
   p->state = RUNNABLE;
   #ifdef RT
+  miss = 0;
   acquire(&ptable.lock);
   itr_q = 0;
   itr_s = 0;
@@ -172,10 +172,12 @@ growproc(int n)
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
 int
+#ifdef RT
 #if RT
 fork(int d, int c)
-#elif !RT
+#else
 fork(int d, int c, int p, int o)
+#endif
 #else
 fork(void)
 #endif
@@ -214,7 +216,7 @@ fork(void)
   // lock to force the compiler to emit the np->state write last.
   acquire(&ptable.lock);
   np->state = RUNNABLE;
-
+  #ifdef RT
   #if RT // EDF
   np->D = d; 							// Set deadline
   np->C = c; 							// Set computation time
@@ -241,9 +243,11 @@ fork(void)
   }
   release(&ptable.lock);
   #endif
+  #else
+  release(&ptable.lock);
+  #endif
   
-  //release(&ptable.lock);
-  
+    
   return pid;
 }
 
@@ -319,17 +323,7 @@ wait(void)
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
-        #ifdef RT
-        p->D = 0;
-        p->C = 0;
-        #if !RT
-        p->P = 0;
-        p->O = 0;
-        #endif
-        p->arrtime = 0;
-        p->firstsch = 0;
-        p->miss = 0;
-        #endif
+        
         release(&ptable.lock);
         return pid;
       }
@@ -361,7 +355,6 @@ scheduler(void)
 
   for(;;){
     // Enable interrupts on this processor.
-
     sti();
     acquire(&ptable.lock);
     
@@ -381,8 +374,8 @@ scheduler(void)
       p->state = RUNNING;
 
       if(p->firstsch == 0) p->firstsch = tick();  // Get data
+      proc->ctxswt++;
 
-      ctxswt++;
       swtch(&cpu->scheduler, proc->context);
       switchkvm();
       proc = 0;
@@ -390,6 +383,18 @@ scheduler(void)
       #if !RT    
       }
       #endif
+    }
+    #else // Convencional
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+      proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      swtch(&cpu->scheduler, proc->context);
+      switchkvm();
+
+      proc = 0;
     }
     #endif
     release(&ptable.lock);
@@ -413,7 +418,7 @@ sched(void)
     panic("sched interruptible");
   intena = cpu->intena;
   #ifdef RT
-  ctxswt++;
+  proc->ctxswt++;
   #endif
   
   swtch(&proc->context, cpu->scheduler);
@@ -425,19 +430,22 @@ void
 yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
+  #ifdef RT
   #if !RT
   if(ptable.queue[0]->P > proc->O){
   #endif
     proc->state = RUNNABLE;
-    #ifdef RT
     itr_q++;
     ptable.queue[itr_q] = proc;               // Insert proc into queue
     increasekey(ptable.queue, itr_q);
-    #endif
     sched();
-  #ifdef RT
+  #if !RT
   }
+  #endif
   interrupt = 0;
+  #else
+  proc->state = RUNNABLE;
+  sched();
   #endif
   
   release(&ptable.lock);
@@ -529,7 +537,9 @@ wakeup(void *chan)
   acquire(&ptable.lock);
   wakeup1(chan);
   release(&ptable.lock);
+  #ifdef RT
   interrupt = 1;          // Enable interrupts
+  #endif
 }
 
 // Kill the process with the given pid.
@@ -603,20 +613,20 @@ procdump(void)
 #ifdef RT
 void getData(struct proc *p){
 
-  if(itr_s > (NPROC*TAM -1)){
+  if(itr_s > (TAM -1)){
     cprintf("ERROR: FULL DATA! Ignoring statistic process... %d\n", itr_s);
   }else{
     #if !RT
     statistic[itr_s].P = p->P;
-    statistic[itr_s].O = p->O; 
+    statistic[itr_s].O = p->O;
     #endif
     statistic[itr_s].firstsch = p->firstsch; p->firstsch = 0;
     statistic[itr_s].arrtime = p->arrtime; p->arrtime = tick();
-    statistic[itr_s].miss = p->miss; p->miss = 0;
     statistic[itr_s].finish = tick();
     statistic[itr_s].pid = p->pid;
     statistic[itr_s].C = p->C;
     statistic[itr_s].D = p->D;
+    statistic[itr_s].ctxswt = p->ctxswt; p->ctxswt= 0;
     itr_s++;
   }
 }
@@ -627,28 +637,37 @@ int print(int flag){
     getData(proc);
   }else if(flag == 1 ){
     #if !RT
-    cprintf("\nP-O-Pid-D-C-Miss-Arr-First-Finish\n");
+    cprintf("\nPid-P-O-D-C-Miss-Ctxswt-Arr-First-Finish-Res-Laten\n");
     #else
-    cprintf("\nPid-D-C-Miss-Arr-First-Finish\n");
+    cprintf("\nPid-D-C-Miss-Ctxswt-Arr-First-Finish-Res-Laten\n");
     #endif
     for(i = 0; i < itr_s; i++){
       // bug in the cprintf
+      cprintf("%d-",  statistic[i].pid);
       #if !RT
       cprintf("%d-",  statistic[i].P);
       cprintf("%d-",  statistic[i].O);
       #endif
-      cprintf("%d-",  statistic[i].pid);
       cprintf("%d-",  statistic[i].D);
       cprintf("%d-",  statistic[i].C);
-      cprintf("%d-",  statistic[i].miss);
+      if((statistic[i].finish - statistic[i].arrtime) > statistic[i].D){
+        cprintf("1-");  // Miss
+        miss++;
+      }
+      else{
+        cprintf("0-");
+      }
+      cprintf("%d-",  statistic[i].ctxswt);
       cprintf("%d-",  statistic[i].arrtime);
       cprintf("%d-",  statistic[i].firstsch);
-      cprintf("%d\n", statistic[i].finish);
+      cprintf("%d-",  statistic[i].finish);
+      cprintf("%d-", (statistic[i].firstsch - statistic[i].arrtime));
+      cprintf("%d\n", (statistic[i].finish - statistic[i].arrtime));
     }
-    
-    cprintf("Context swtch = %d\n", ctxswt);
+    cprintf("%d-",  miss);
+    miss = 0 ;    
   }else{
-    for(i = 0; i < itr_s; i++){
+    /*for(i = 0; i < itr_s; i++){
       #if !RT
       statistic[i].P = 0;
       statistic[i].O = 0;
@@ -656,13 +675,14 @@ int print(int flag){
       statistic[i].pid = 0;
       statistic[i].D = 0;
       statistic[i].C = 0;
-      statistic[i].miss = 0;
+      statistic[i].ctxswt = 0;
       statistic[i].finish = 0;
       statistic[i].arrtime = 0;
       statistic[i].firstsch = 0;
-    }
-    itr_s = ctxswt = 0;
+    }*/
+    itr_s = 0;
   }
+  
 
   return 0; 
 }
