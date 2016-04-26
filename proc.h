@@ -57,6 +57,7 @@ struct proc {
   #if !RT
   uint O;                      // Threshold
   uint P;                      // Priority
+    int rt; 
   #endif
   uint ctxswt;                  // Number of context swtch
   unsigned long long arrtime;   // Arrival time of process 
@@ -77,6 +78,7 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
 };
 
 #ifdef RT
@@ -94,7 +96,8 @@ struct statistic {
   uint D;                      // Deadline = ms
   uint C;
   uint ctxswt;
-  int pid;  
+  int pid; 
+
 };
 #endif
 

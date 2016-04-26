@@ -5,4 +5,5 @@
 void heapify(struct proc **A, int, int);
 void increasekey(struct proc **A, int);
 int deadline(struct proc *p);
+void shitf(struct proc **A, int);
 unsigned long long tick();

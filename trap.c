@@ -14,6 +14,12 @@ extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
 
+unsigned long long tick2() {
+  unsigned long long t;
+  __asm__ __volatile__ ("rdtsc  " : "=A"(t));
+  return t >> 21;
+}
+
 void
 tvinit(void)
 {
@@ -50,7 +56,8 @@ trap(struct trapframe *tf)
   case T_IRQ0 + IRQ_TIMER:
     if(cpu->id == 0){
       acquire(&tickslock);
-      ticks++;
+      ticks = tick2();
+      //cprintf("ticks = %d, %d\n", ticks, tf->trapno);
       wakeup(&ticks);
       release(&tickslock);
     }
@@ -80,8 +87,9 @@ trap(struct trapframe *tf)
   case 14:
     if(cpu->id == 0){
         acquire(&tickslock);
-        ticks++;
+        ticks = tick2();
         wakeup(&ticks);
+          cprintf("ticks = %d\n", ticks);
         release(&tickslock);
       }
     break;
@@ -110,8 +118,10 @@ trap(struct trapframe *tf)
 
   
   #ifdef RT
-  if(proc && proc->state == RUNNING && interrupt)
+  if(proc && proc->state == RUNNING && interrupt){
+    interrupt = 0;
     yield();
+  }
   #else
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.

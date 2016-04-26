@@ -1,3 +1,32 @@
+-> verificar revistas para submissão
+
+-> buscar empresas de RT para coletar dados sobre número de processos usados
+
+-> pensar sobre limite de processos..
+
+-> ver sobre o thresholds:
+-> com um conjunto de processos limitados até N
+	-> remoção e inclusão de processos
+	-> conjunto dinâmico com N processos
+	-> é possível realizar em tempo de execução?
+	-> até que ponto é viável?
+
+-> verificar se Buttazzo trabalha com o conjunto de processos estático usando thresholds.
+
+-> implementar equação
+
+-> pensar na aplicação prática da teoria
+	- achar uma aproximação para o real da teoria
+
+=========// ============= //
+
+verificar o pior caso de execução onde todos chegam juntos
+
+
+
+
+=========// ============= //
+
 -> Manter por enquanto os mesmos estados para o processo. Criar somente depois para fazer a diferenciação entre um conjunto de processos estático e dinâmicos.
 
 Estático: realizar toda a instanciação de processos através do fork, atribuindo um estado intermediário entre RUNNABLE e RUNNING, que seria um estado sinalizador de 'pronto para ser usado pelo sistema', significaria que o sistema já tem conhecimento da existência do determinado processo e saberá que não havéra mudanças no conjunto de processos no decorrer da execução.
@@ -39,7 +68,6 @@ Modificar os arquivos:
 
 	IMPLEMENTAR FUNÇÃO DE ORDENAÇÃO
 
-	TRATAR OVERFLOW DO TIPO
 
 	ok - INSERIR NOVAMENTE O PROCESSO NA FILA DE PRONTO SE ELE AINDA NÃO ACABOU, OU SEJA, EM TODOS OS LUGARES EM QUE O PROCESSO É POSTO COMO RUNNABLE
 

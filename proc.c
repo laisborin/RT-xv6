@@ -8,13 +8,13 @@
 #include "proc.h"
 #include "fs.h"
 #include "spinlock.h"
-#define TAM 45000 // TAM*NPROC = statistic
+#define TAM 50000 // TAM*NPROC = statistic
 
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
   #ifdef RT
-  struct proc *queue[NPROC]; // Ready queue  
+  struct proc *queue[NPROC]; // Ready queue 
   #endif
 } ptable;
 
@@ -23,6 +23,7 @@ struct {
 int miss;
 uint itr_q; // Iterator in ready queue
 uint itr_s; // Iterator in statistic
+uint itr_p; // Iterator in preempt
 uint frozen;
 struct statistic statistic[TAM];  
 
@@ -93,6 +94,7 @@ found:
   interrupt = 0;
   p->D = 0;
   p->C = 0;
+  p->ctxswt = 0;
   p->arrtime = 0;       // Tempo de chegada
   p->firstsch = 0;      // Instante do primeiro escalonamento
   #if !RT
@@ -221,6 +223,7 @@ fork(void)
   np->D = d; 							// Set deadline
   np->C = c; 							// Set computation time
   np->arrtime = tick();                 // Get arrival time
+  np->ctxswt = 0;
 
   itr_q++;
   ptable.queue[itr_q] = np;             // Insert np into queue
@@ -233,8 +236,11 @@ fork(void)
   np->C = c;                            // Set computation time
   np->P = p;							// Set priority
   np->O = o;							// Set threshold
+  np->ctxswt = 0;
 
-  if(frozen){np->state = WAITING;}      // Criação de processos em lote
+  if(frozen){np->state = WAITING;
+    np->rt = 1;
+  }      // Criação de processos em lote
   else{									                // Criação de processos do sistema
     np->arrtime = tick();               // Get arrival time
     itr_q++;
@@ -361,28 +367,30 @@ scheduler(void)
     #ifdef RT
     if(itr_q != -1){
       p = ptable.queue[0];
+      ptable.queue[0]->ctxswt++;
       #if !RT
-      if(!frozen || p->P > proc->O){                // Escalonamento com PT    
+      if(!frozen || p->P > proc->O){                // Escalonamento com PT
       #endif
+
+        ptable.queue[0] = ptable.queue[itr_q];
+        heapify(ptable.queue, itr_q, 0);            // Sort queue
+        itr_q--;
+
+        proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+
+        if(p->firstsch == 0) p->firstsch = tick();  // Get data
         
-      ptable.queue[0] = ptable.queue[itr_q];
-      heapify(ptable.queue, itr_q, 0);		        // Sort queue
-      itr_q--;
+        //proc->ctxswt++;
+        swtch(&cpu->scheduler, proc->context);
+        
+        switchkvm();
+        proc = 0;
 
-      proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      if(p->firstsch == 0) p->firstsch = tick();  // Get data
-      proc->ctxswt++;
-
-      swtch(&cpu->scheduler, proc->context);
-      switchkvm();
-      proc = 0;
-
-      #if !RT    
-      }
-      #endif
+        #if !RT
+        }
+        #endif
     }
     #else // Convencional
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -418,7 +426,7 @@ sched(void)
     panic("sched interruptible");
   intena = cpu->intena;
   #ifdef RT
-  proc->ctxswt++;
+  //proc->ctxswt++;
   #endif
   
   swtch(&proc->context, cpu->scheduler);
@@ -523,9 +531,13 @@ wakeup1(void *chan)
       #ifdef RT
       p->arrtime = tick();		          //Necessário para realizar os testes
       p->firstsch = 0;
+      p->ctxswt = 0;
       itr_q++;
       ptable.queue[itr_q] = p;          // Insert p into queue
       increasekey(ptable.queue, itr_q);
+      #if !RT
+      interrupt = 1;          // Enable interrupts
+      #endif
       #endif
     }
 }
@@ -537,9 +549,6 @@ wakeup(void *chan)
   acquire(&ptable.lock);
   wakeup1(chan);
   release(&ptable.lock);
-  #ifdef RT
-  interrupt = 1;          // Enable interrupts
-  #endif
 }
 
 // Kill the process with the given pid.
@@ -611,7 +620,8 @@ procdump(void)
 }
 
 #ifdef RT
-void getData(struct proc *p){
+void getData(struct proc *p)
+{
 
   if(itr_s > (TAM -1)){
     cprintf("ERROR: FULL DATA! Ignoring statistic process... %d\n", itr_s);
@@ -626,20 +636,22 @@ void getData(struct proc *p){
     statistic[itr_s].pid = p->pid;
     statistic[itr_s].C = p->C;
     statistic[itr_s].D = p->D;
-    statistic[itr_s].ctxswt = p->ctxswt; p->ctxswt= 0;
+    statistic[itr_s].ctxswt = p->ctxswt; 
+    p->ctxswt= 0;
     itr_s++;
   }
 }
 
-int print(int flag){
+int print(int flag)
+{
   int i;
   if(flag == 2){
     getData(proc);
   }else if(flag == 1 ){
     #if !RT
-    cprintf("\nPid-P-O-D-C-Miss-Ctxswt-Arr-First-Finish-Res-Laten\n");
+    cprintf("\nPid-P-O-D-C-Ctxswt-Arr-First-Finish-Res-Laten-Miss\n");
     #else
-    cprintf("\nPid-D-C-Miss-Ctxswt-Arr-First-Finish-Res-Laten\n");
+    cprintf("\nPid-D-C-Ctxswt-Arr-First-Finish-Res-Laten-Miss\n");
     #endif
     for(i = 0; i < itr_s; i++){
       // bug in the cprintf
@@ -650,36 +662,24 @@ int print(int flag){
       #endif
       cprintf("%d-",  statistic[i].D);
       cprintf("%d-",  statistic[i].C);
-      if((statistic[i].finish - statistic[i].arrtime) > statistic[i].D){
-        cprintf("1-");  // Miss
-        miss++;
-      }
-      else{
-        cprintf("0-");
-      }
+      
       cprintf("%d-",  statistic[i].ctxswt);
       cprintf("%d-",  statistic[i].arrtime);
       cprintf("%d-",  statistic[i].firstsch);
       cprintf("%d-",  statistic[i].finish);
       cprintf("%d-", (statistic[i].firstsch - statistic[i].arrtime));
-      cprintf("%d\n", (statistic[i].finish - statistic[i].arrtime));
+      cprintf("%d-", (statistic[i].finish - statistic[i].arrtime));
+      if((statistic[i].finish - statistic[i].arrtime) > statistic[i].D){
+        cprintf("1-MISS\n");  // Miss
+        miss++;
+      }
+      else{
+        cprintf("0\n");
+      }
     }
-    cprintf("%d-",  miss);
+    cprintf("miss = %d-",  miss);
     miss = 0 ;    
   }else{
-    /*for(i = 0; i < itr_s; i++){
-      #if !RT
-      statistic[i].P = 0;
-      statistic[i].O = 0;
-      #endif
-      statistic[i].pid = 0;
-      statistic[i].D = 0;
-      statistic[i].C = 0;
-      statistic[i].ctxswt = 0;
-      statistic[i].finish = 0;
-      statistic[i].arrtime = 0;
-      statistic[i].firstsch = 0;
-    }*/
     itr_s = 0;
   }
   
@@ -687,7 +687,8 @@ int print(int flag){
   return 0; 
 }
 
-void freeze(int f){
+void freeze(int f)
+{
   struct proc *p;
 
   if(f){

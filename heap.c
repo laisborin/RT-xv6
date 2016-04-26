@@ -5,9 +5,11 @@
 #include "mmu.h"
 #include "x86.h"
 #include "proc.h"
+
 #ifdef RT
+
 // Used by EDF
-#if RT // MIN HEAP - DEADLINE
+#if RT // MIN HEAP - LESS DEADLINE
 int deadline(struct proc *p){
   if(tick() <= (p->arrtime + p->D)){  
     return (p->arrtime + p->D) - tick();
@@ -26,7 +28,7 @@ void heapify(struct proc **A, int itr_q, int i){
   int min = i;
   struct proc *swap;
 
-  if(LEFT(i) < itr_q && deadline(A[LEFT(i)]) < deadline(A[i]))       min = LEFT(i);
+  if(LEFT(i) < itr_q && deadline(A[LEFT(i)]) < deadline(A[i]))      min = LEFT(i);
   if(RIGHT(i) < itr_q && deadline(A[RIGHT(i)]) < deadline(A[min]))  min = RIGHT(i);
   if(min != i){
     swap = A[i];  A[i] = A[min];  A[min] = swap;
@@ -45,12 +47,12 @@ void increasekey(struct proc **A, int i){
 
 
 // Used by PT
-#else // MAX HEAP - PRIORITY
+#else // MAX HEAP - HIGHEST PRIORITY
 void heapify(struct proc **A, int itr_q, int i){
   int max = i;
   struct proc *swap;
 
-  if(LEFT(i) < itr_q && A[LEFT(i)]->P > A[i]->P)       max = LEFT(i);
+  if(LEFT(i) < itr_q && A[LEFT(i)]->P > A[i]->P)      max = LEFT(i);
   if(RIGHT(i) < itr_q && A[RIGHT(i)]->P > A[max]->P)  max = RIGHT(i);
   if(max != i){
     swap = A[i];  A[i] = A[max];  A[max] = swap;
@@ -64,6 +66,13 @@ void increasekey(struct proc **A, int i){
   while(i > 0 && A[PARENT(i)]->P < A[i]->P){
     swap = A[i]; A[i] = A[PARENT(i)]; A[PARENT(i)] = swap;
     i = PARENT(i);
+  }
+}
+void shitf(struct proc **A, int i){
+      
+  while(i > 0){
+    A[i] = A[i-1];
+    i--;
   }
 }
 #endif
