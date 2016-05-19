@@ -142,7 +142,7 @@ userinit(void)
   p->C = 100;
   #if !RT
   p->P = 1;
-  p->O = 1;			
+  p->O = 1;     
   frozen = 0;   // Sinaliza a criação de processos do sistema
   #endif
   ptable.queue[itr_q] = p; 
@@ -220,8 +220,8 @@ fork(void)
   np->state = RUNNABLE;
   #ifdef RT
   #if RT // EDF
-  np->D = d; 							// Set deadline
-  np->C = c; 							// Set computation time
+  np->D = d;              // Set deadline
+  np->C = c;              // Set computation time
   np->arrtime = tick();                 // Get arrival time
   np->ctxswt = 0;
 
@@ -229,19 +229,18 @@ fork(void)
   ptable.queue[itr_q] = np;             // Insert np into queue
   increasekey(ptable.queue, itr_q);     // Sort queue by EDF 
   release(&ptable.lock);
-  interrupt = 1;
+  yield();
+  //interrupt = 1;
 
   #else // PT
   np->D = d;                            // Set deadline
   np->C = c;                            // Set computation time
-  np->P = p;							// Set priority
-  np->O = o;							// Set threshold
+  np->P = p;              // Set priority
+  np->O = o;              // Set threshold
   np->ctxswt = 0;
 
-  if(frozen){np->state = WAITING;
-    np->rt = 1;
-  }      // Criação de processos em lote
-  else{									                // Criação de processos do sistema
+  if(frozen){np->state = WAITING;}      // Criação de processos em lote
+  else{                                 // Criação de processos do sistema
     np->arrtime = tick();               // Get arrival time
     itr_q++;
     ptable.queue[itr_q] = np;           // Insert np into queue
@@ -382,7 +381,6 @@ scheduler(void)
 
         if(p->firstsch == 0) p->firstsch = tick();  // Get data
         
-        //proc->ctxswt++;
         swtch(&cpu->scheduler, proc->context);
         
         switchkvm();
@@ -425,10 +423,7 @@ sched(void)
   if(readeflags()&FL_IF)
     panic("sched interruptible");
   intena = cpu->intena;
-  #ifdef RT
-  //proc->ctxswt++;
-  #endif
-  
+ 
   swtch(&proc->context, cpu->scheduler);
   cpu->intena = intena;
 }
@@ -504,6 +499,7 @@ sleep(void *chan, struct spinlock *lk)
 
   // Go to sleep.
   proc->chan = chan;
+  //cprintf("sleep %d - %d\n", *(int*)chan, proc->pid);
   proc->state = SLEEPING;
   sched();
 
@@ -526,10 +522,12 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan){
+    if(p->state == SLEEPING && *(int *)p->chan == *(int *)chan){
+      //cprintf("wakeup1 %d - %d\n", *(int *)chan, p->pid);
       p->state = RUNNABLE;
+      p->chan = 0;
       #ifdef RT
-      p->arrtime = tick();		          //Necessário para realizar os testes
+      p->arrtime = tick();              //Necessário para realizar os testes
       p->firstsch = 0;
       p->ctxswt = 0;
       itr_q++;
@@ -624,7 +622,8 @@ void getData(struct proc *p)
 {
 
   if(itr_s > (TAM -1)){
-    cprintf("ERROR: FULL DATA! Ignoring statistic process... %d\n", itr_s);
+    cprintf(".");
+    //cprintf("ERROR: FULL DATA! Ignoring statistic process... %d\n", itr_s);
   }else{
     #if !RT
     statistic[itr_s].P = p->P;
@@ -655,6 +654,7 @@ int print(int flag)
     #endif
     for(i = 0; i < itr_s; i++){
       // bug in the cprintf
+      if(!statistic[i].P) continue;
       cprintf("%d-",  statistic[i].pid);
       #if !RT
       cprintf("%d-",  statistic[i].P);
@@ -682,8 +682,6 @@ int print(int flag)
   }else{
     itr_s = 0;
   }
-  
-
   return 0; 
 }
 
@@ -697,18 +695,19 @@ void freeze(int f)
     frozen = 0;
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    	if(p->state == WAITING){
-    		p->state = RUNNABLE;          // Unfreeze all created processes
-    		itr_q++;
-    		ptable.queue[itr_q] = p;                     
-    		increasekey(ptable.queue, itr_q);
-    	}
+      if(p->state == WAITING){
+        p->state = RUNNABLE;          // Unfreeze all created processes
+        itr_q++;
+        ptable.queue[itr_q] = p;                     
+        increasekey(ptable.queue, itr_q);
+      }
     }
     release(&ptable.lock);
   }
 }
 
-void printQueue(){
+void printQueue()
+{
   int i;
   for(i = 0; i <= itr_q; i++){
    cprintf("p->pid = %d -- itr_q = %d\n", ptable.queue[i]->pid, itr_q);

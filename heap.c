@@ -10,7 +10,9 @@
 
 // Used by EDF
 #if RT // MIN HEAP - LESS DEADLINE
-int deadline(struct proc *p){
+int 
+deadline(struct proc *p)
+{
   if(tick() <= (p->arrtime + p->D)){  
     return (p->arrtime + p->D) - tick();
   }
@@ -24,7 +26,9 @@ int deadline(struct proc *p){
   return 0;
 }
 
-void heapify(struct proc **A, int itr_q, int i){
+void 
+heapify(struct proc **A, int itr_q, int i)
+{
   int min = i;
   struct proc *swap;
 
@@ -36,7 +40,9 @@ void heapify(struct proc **A, int itr_q, int i){
   }
 }
 
-void increasekey(struct proc **A, int i){
+void 
+increasekey(struct proc **A, int i)
+{
   struct proc *swap;
       
   while(i > 0 && deadline(A[PARENT(i)]) > deadline(A[i])){
@@ -45,10 +51,11 @@ void increasekey(struct proc **A, int i){
   }
 }
 
-
 // Used by PT
 #else // MAX HEAP - HIGHEST PRIORITY
-void heapify(struct proc **A, int itr_q, int i){
+void 
+heapify(struct proc **A, int itr_q, int i)
+{
   int max = i;
   struct proc *swap;
 
@@ -60,7 +67,9 @@ void heapify(struct proc **A, int itr_q, int i){
   }
 }
 
-void increasekey(struct proc **A, int i){
+void 
+increasekey(struct proc **A, int i)
+{
   struct proc *swap;
       
   while(i > 0 && A[PARENT(i)]->P < A[i]->P){
@@ -68,7 +77,9 @@ void increasekey(struct proc **A, int i){
     i = PARENT(i);
   }
 }
-void shitf(struct proc **A, int i){
+void 
+shitf(struct proc **A, int i)
+{
       
   while(i > 0){
     A[i] = A[i-1];
@@ -77,9 +88,11 @@ void shitf(struct proc **A, int i){
 }
 #endif
 
-unsigned long long tick() {
+unsigned long long 
+tick()
+{
   unsigned long long t;
   __asm__ __volatile__ ("rdtsc  " : "=A"(t));
-  return t >> 21;
+  return t >> 23;
 }
 #endif  

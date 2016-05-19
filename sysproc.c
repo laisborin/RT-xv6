@@ -8,6 +8,12 @@
 #include "proc.h"
 
 #ifdef RT
+unsigned long long ticks1()
+{
+  unsigned long long t;
+  __asm__ __volatile__ ("rdtsc  " : "=A"(t));
+  return t >> 23;
+}
 int
 sys_print(void)
 {
@@ -29,7 +35,6 @@ sys_freeze(void)
   return 0;
 }
 #endif
-
 int
 sys_fork(void)
 {
@@ -60,20 +65,17 @@ sys_fork(void)
   return fork();
   #endif
 }
-
 int
 sys_exit(void)
 {
   exit();
   return 0;  // not reached
 }
-
 int
 sys_wait(void)
 {
   return wait();
 }
-
 int
 sys_kill(void)
 {
@@ -83,13 +85,11 @@ sys_kill(void)
     return -1;
   return kill(pid);
 }
-
 int
 sys_getpid(void)
 {
   return proc->pid;
 }
-
 int
 sys_sbrk(void)
 {
@@ -113,18 +113,27 @@ sys_sleep(void)
   if(argint(0, &n) < 0)
     return -1;
   acquire(&tickslock);
+  #ifdef RT
+  ticks0 = ticks1();
+  #else
   ticks0 = ticks;
+  #endif
+
+  #ifdef RT
+  while(ticks1() - ticks0 < n){
+  #else
   while(ticks - ticks0 < n){
+  #endif
     if(proc->killed){
       release(&tickslock);
       return -1;
     }
+
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
   return 0;
 }
-
 // return how many clock tick interrupts have occurred
 // since start.
 int

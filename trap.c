@@ -17,7 +17,7 @@ uint ticks;
 unsigned long long tick2() {
   unsigned long long t;
   __asm__ __volatile__ ("rdtsc  " : "=A"(t));
-  return t >> 21;
+  return t >> 19; //19
 }
 
 void
@@ -51,15 +51,18 @@ trap(struct trapframe *tf)
       exit();
     return;
   }
-
   switch(tf->trapno){
   case T_IRQ0 + IRQ_TIMER:
     if(cpu->id == 0){
       acquire(&tickslock);
+      #ifdef RT
       ticks = tick2();
-      //cprintf("ticks = %d, %d\n", ticks, tf->trapno);
+      #else
+      ticks++;
+      #endif
       wakeup(&ticks);
       release(&tickslock);
+  
     }
     lapiceoi();
     break;
@@ -87,10 +90,10 @@ trap(struct trapframe *tf)
   case 14:
     if(cpu->id == 0){
         acquire(&tickslock);
-        ticks = tick2();
         wakeup(&ticks);
-          cprintf("ticks = %d\n", ticks);
+        ticks = tick2();
         release(&tickslock);
+        
       }
     break;
   //PAGEBREAK: 13
